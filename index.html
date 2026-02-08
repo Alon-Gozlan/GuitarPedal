@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Guitar Pedal - Browser Audio Effects</title>
+
+  <!--
+    SECURITY: Content Security Policy (CSP) Meta Tags
+    - default-src 'self': Only allow resources from the same origin
+    - script-src 'self': Only allow scripts from the same origin (no inline, no eval)
+    - style-src 'self': Only allow stylesheets from the same origin
+    - img-src 'self' data:: Allow images from same origin and inline data URIs (for SVG dropdown arrow)
+    - media-src 'self' blob: mediastream:: Allow audio from same origin, blob URLs, and MediaStream
+    - connect-src 'none': Block ALL network requests (no fetch, XHR, WebSocket)
+    - object-src 'none': Block plugins (Flash, Java, etc.)
+    - frame-src 'none': Block iframes
+    - base-uri 'self': Prevent base tag injection
+    - form-action 'none': Prevent form submissions to external URLs
+  -->
+  <meta http-equiv="Content-Security-Policy"
+        content="default-src 'self';
+                 script-src 'self';
+                 style-src 'self';
+                 img-src 'self' data:;
+                 media-src 'self' blob: mediastream:;
+                 connect-src 'none';
+                 object-src 'none';
+                 frame-src 'none';
+                 base-uri 'self';
+                 form-action 'none';">
+
+  <!-- SECURITY: Prevent MIME type sniffing -->
+  <meta http-equiv="X-Content-Type-Options" content="nosniff">
+
+  <!-- SECURITY: Prevent referrer leaking -->
+  <meta name="referrer" content="no-referrer">
+
+  <!-- SECURITY: Permissions Policy - only allow microphone, deny everything else -->
+  <meta http-equiv="Permissions-Policy"
+        content="microphone=(self), camera=(), geolocation=(), payment=()">
+
+  <meta name="description" content="A secure, browser-based guitar pedal with reverb, delay, and distortion effects. All audio processing happens locally - your data never leaves your device.">
+
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <!-- SECURITY: Privacy notice displayed prominently -->
+  <div class="privacy-notice">
+    <span class="lock-icon">&#x1f512;</span>
+    Your audio is processed locally and never leaves your device.
+    No data is stored, transmitted, or tracked.
+  </div>
+
+  <!-- Pedal Enclosure -->
+  <div class="pedal">
+    <div class="pedal-body">
+
+      <!-- Brand -->
+      <div class="pedal-brand">
+        <h1>Guitar Pedal</h1>
+        <div class="subtitle">Digital Effects Processor</div>
+      </div>
+
+      <!-- LED Indicators -->
+      <div class="led-row">
+        <div class="led-group">
+          <div class="led" id="permission-led"></div>
+          <label>Mic</label>
+        </div>
+        <div class="led-group">
+          <div class="led" id="recording-led"></div>
+          <label>Rec</label>
+        </div>
+        <div class="led-group">
+          <div class="led" id="playback-led"></div>
+          <label>Play</label>
+        </div>
+      </div>
+
+      <!-- Status Badges -->
+      <div class="status-row">
+        <span class="status-badge" id="permission-status">Microphone: Not Connected</span>
+        <span class="status-badge" id="recording-status">No Recording</span>
+        <span class="status-badge" id="playback-status">Stopped</span>
+      </div>
+
+      <!-- Controls -->
+      <div class="controls-section">
+        <!-- Start Button (triggers microphone permission) -->
+        <div class="button-row">
+          <button class="pedal-btn btn-start" id="start-btn" type="button">Start</button>
+        </div>
+
+        <!-- Record and Play Buttons -->
+        <div class="button-row">
+          <button class="pedal-btn btn-record" id="record-btn" type="button" disabled>Record</button>
+          <button class="pedal-btn btn-play" id="play-btn" type="button" disabled>Play</button>
+        </div>
+
+        <!-- Clear Button -->
+        <div class="button-row">
+          <button class="pedal-btn btn-clear" id="clear-btn" type="button" disabled>Clear</button>
+        </div>
+      </div>
+
+      <!-- Effect Selector -->
+      <div class="effect-section">
+        <label class="section-label" for="effect-select">Effect</label>
+        <select class="effect-select" id="effect-select">
+          <option value="reverb">Reverb</option>
+          <option value="delay">Delay</option>
+          <option value="distortion">Distortion</option>
+        </select>
+      </div>
+
+      <!-- Effect Parameters -->
+      <div class="params-section">
+        <div class="param-group" id="param-group-1">
+          <label id="param-1-label">Mix</label>
+          <input type="range" class="param-slider" id="param-1" min="0" max="100" value="50">
+          <span class="param-value" id="param-1-value">50%</span>
+        </div>
+        <div class="param-group" id="param-group-2">
+          <label id="param-2-label">Decay</label>
+          <input type="range" class="param-slider" id="param-2" min="1" max="50" value="20">
+          <span class="param-value" id="param-2-value">20s</span>
+        </div>
+        <div class="param-group" id="param-group-3">
+          <label id="param-3-label">Tone</label>
+          <input type="range" class="param-slider" id="param-3" min="0" max="100" value="70">
+          <span class="param-value" id="param-3-value">70%</span>
+        </div>
+      </div>
+
+      <!-- Status Message -->
+      <div class="status-message info" id="status-message">
+        Click "Start" to connect your microphone.
+      </div>
+
+      <!-- Footer (jack labels) -->
+      <div class="pedal-footer">
+        <div class="jack-labels">
+          <div class="jack-label">
+            <div class="jack"></div>
+            Input
+          </div>
+          <div class="jack-label">
+            <div class="jack"></div>
+            Output
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Page Footer -->
+  <div class="page-footer">
+    <p>No analytics. No tracking. No external resources. 100% client-side.</p>
+    <p>Requires HTTPS and a modern browser. See SECURITY.md for details.</p>
+  </div>
+
+  <!--
+    SECURITY: Scripts loaded in order with no inline JavaScript.
+    effects.js must load before audio-engine.js (depends on createEffect function).
+    audio-engine.js must load before app.js (depends on AudioEngine object).
+  -->
+  <script src="effects.js"></script>
+  <script src="audio-engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
