@@ -1,0 +1,638 @@
+/**
+ * styles.css - Guitar Pedal Aesthetic UI
+ *
+ * SECURITY: No external resources (fonts, images, CDNs) are loaded.
+ * All visuals are created with pure CSS.
+ */
+
+/* ============================================================
+   CSS Custom Properties (Theme)
+   ============================================================ */
+:root {
+  --pedal-bg: #2a2a2a;
+  --pedal-surface: #3a3a3a;
+  --pedal-border: #1a1a1a;
+  --pedal-highlight: #4a4a4a;
+  --pedal-shadow: #111111;
+  --text-primary: #e0e0e0;
+  --text-secondary: #999999;
+  --accent-blue: #4a9eff;
+  --accent-green: #4aff7a;
+  --accent-red: #ff4a4a;
+  --accent-amber: #ffaa4a;
+  --accent-purple: #aa4aff;
+  --knob-size: 60px;
+  --led-size: 10px;
+}
+
+/* ============================================================
+   Base Reset & Body
+   ============================================================ */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+}
+
+body {
+  font-family: 'Courier New', Courier, monospace;
+  background: #1a1a2e;
+  color: var(--text-primary);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+  background-image:
+    radial-gradient(circle at 20% 50%, rgba(74, 158, 255, 0.05) 0%, transparent 50%),
+    radial-gradient(circle at 80% 50%, rgba(170, 74, 255, 0.05) 0%, transparent 50%);
+}
+
+/* ============================================================
+   Privacy Notice Banner
+   ============================================================ */
+.privacy-notice {
+  background: linear-gradient(135deg, #1a3a2a, #1a2a3a);
+  border: 1px solid var(--accent-green);
+  border-radius: 8px;
+  padding: 12px 20px;
+  margin-bottom: 20px;
+  max-width: 600px;
+  text-align: center;
+  font-size: 0.85rem;
+  color: var(--accent-green);
+  box-shadow: 0 0 10px rgba(74, 255, 122, 0.1);
+}
+
+.privacy-notice .lock-icon {
+  font-size: 1.1rem;
+  margin-right: 6px;
+}
+
+/* ============================================================
+   Pedal Enclosure
+   ============================================================ */
+.pedal {
+  background: var(--pedal-bg);
+  border: 3px solid var(--pedal-border);
+  border-radius: 20px;
+  padding: 30px 25px;
+  max-width: 420px;
+  width: 100%;
+  box-shadow:
+    0 10px 40px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 var(--pedal-highlight),
+    0 0 0 1px var(--pedal-shadow);
+  position: relative;
+}
+
+/* Faux screws in corners */
+.pedal::before,
+.pedal::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: radial-gradient(circle, #555 30%, #333 70%);
+  border-radius: 50%;
+  border: 1px solid #222;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,0.1);
+}
+.pedal::before {
+  top: 12px;
+  left: 12px;
+}
+.pedal::after {
+  top: 12px;
+  right: 12px;
+}
+
+/* Bottom screws via the pedal-body wrapper */
+.pedal-body {
+  position: relative;
+}
+.pedal-body::before,
+.pedal-body::after {
+  content: '';
+  position: absolute;
+  width: 12px;
+  height: 12px;
+  background: radial-gradient(circle, #555 30%, #333 70%);
+  border-radius: 50%;
+  border: 1px solid #222;
+  box-shadow: inset 0 1px 2px rgba(255,255,255,0.1);
+  bottom: -18px;
+}
+.pedal-body::before {
+  left: -13px;
+}
+.pedal-body::after {
+  right: -13px;
+}
+
+/* ============================================================
+   Brand / Title
+   ============================================================ */
+.pedal-brand {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.pedal-brand h1 {
+  font-size: 1.6rem;
+  font-weight: bold;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: var(--accent-blue);
+  text-shadow: 0 0 10px rgba(74, 158, 255, 0.3);
+}
+
+.pedal-brand .subtitle {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  letter-spacing: 6px;
+  text-transform: uppercase;
+  margin-top: 2px;
+}
+
+/* ============================================================
+   LED Indicators
+   ============================================================ */
+.led-row {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  margin-bottom: 18px;
+}
+
+.led-group {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.led-group label {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+  letter-spacing: 1px;
+}
+
+.led {
+  width: var(--led-size);
+  height: var(--led-size);
+  border-radius: 50%;
+  background: #333;
+  border: 1px solid #555;
+  box-shadow: inset 0 1px 2px rgba(0,0,0,0.5);
+  transition: all 0.3s ease;
+}
+
+.led-on {
+  background: var(--accent-green);
+  box-shadow:
+    0 0 6px var(--accent-green),
+    0 0 12px rgba(74, 255, 122, 0.3),
+    inset 0 0 2px rgba(255,255,255,0.3);
+}
+
+.led-recording {
+  background: var(--accent-red);
+  box-shadow:
+    0 0 6px var(--accent-red),
+    0 0 12px rgba(255, 74, 74, 0.3),
+    inset 0 0 2px rgba(255,255,255,0.3);
+  animation: pulse-led 1s ease-in-out infinite;
+}
+
+.led-playing {
+  background: var(--accent-blue);
+  box-shadow:
+    0 0 6px var(--accent-blue),
+    0 0 12px rgba(74, 158, 255, 0.3),
+    inset 0 0 2px rgba(255,255,255,0.3);
+  animation: pulse-led 0.8s ease-in-out infinite;
+}
+
+.led-ready {
+  background: var(--accent-amber);
+  box-shadow:
+    0 0 6px var(--accent-amber),
+    0 0 12px rgba(255, 170, 74, 0.3),
+    inset 0 0 2px rgba(255,255,255,0.3);
+}
+
+@keyframes pulse-led {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+/* ============================================================
+   Status Badges
+   ============================================================ */
+.status-row {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 18px;
+  flex-wrap: wrap;
+}
+
+.status-badge {
+  font-size: 0.65rem;
+  padding: 3px 10px;
+  border-radius: 10px;
+  background: var(--pedal-surface);
+  border: 1px solid #555;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.status-badge.active {
+  color: var(--accent-green);
+  border-color: var(--accent-green);
+  background: rgba(74, 255, 122, 0.1);
+}
+
+.status-badge.recording {
+  color: var(--accent-red);
+  border-color: var(--accent-red);
+  background: rgba(255, 74, 74, 0.1);
+  animation: pulse-badge 1s ease-in-out infinite;
+}
+
+.status-badge.playing {
+  color: var(--accent-blue);
+  border-color: var(--accent-blue);
+  background: rgba(74, 158, 255, 0.1);
+}
+
+@keyframes pulse-badge {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+/* ============================================================
+   Buttons Section
+   ============================================================ */
+.controls-section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 22px;
+}
+
+.button-row {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+}
+
+/* Footswitch-style button */
+.pedal-btn {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.8rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 12px 20px;
+  border: 2px solid #555;
+  border-radius: 8px;
+  background: linear-gradient(180deg, #4a4a4a, #333333);
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  box-shadow:
+    0 4px 8px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.1);
+  flex: 1;
+  max-width: 180px;
+  min-width: 100px;
+}
+
+.pedal-btn:hover:not(:disabled) {
+  background: linear-gradient(180deg, #555555, #3a3a3a);
+  border-color: #777;
+}
+
+.pedal-btn:active:not(:disabled) {
+  transform: translateY(2px);
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.1);
+}
+
+.pedal-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+/* Special button styles */
+.pedal-btn.btn-start {
+  border-color: var(--accent-green);
+  color: var(--accent-green);
+}
+.pedal-btn.btn-start:hover:not(:disabled) {
+  background: linear-gradient(180deg, #2a4a2a, #1a3a1a);
+  box-shadow: 0 0 10px rgba(74, 255, 122, 0.2);
+}
+
+.pedal-btn.btn-record {
+  border-color: var(--accent-red);
+  color: var(--accent-red);
+}
+.pedal-btn.btn-record:hover:not(:disabled) {
+  background: linear-gradient(180deg, #4a2a2a, #3a1a1a);
+  box-shadow: 0 0 10px rgba(255, 74, 74, 0.2);
+}
+.pedal-btn.btn-record.active {
+  background: rgba(255, 74, 74, 0.2);
+  border-color: var(--accent-red);
+  animation: pulse-btn 1s ease-in-out infinite;
+}
+
+.pedal-btn.btn-play {
+  border-color: var(--accent-blue);
+  color: var(--accent-blue);
+}
+.pedal-btn.btn-play:hover:not(:disabled) {
+  background: linear-gradient(180deg, #2a2a4a, #1a1a3a);
+  box-shadow: 0 0 10px rgba(74, 158, 255, 0.2);
+}
+.pedal-btn.btn-play.active {
+  background: rgba(74, 158, 255, 0.2);
+  border-color: var(--accent-blue);
+}
+
+.pedal-btn.btn-clear {
+  border-color: var(--accent-amber);
+  color: var(--accent-amber);
+  max-width: 120px;
+}
+.pedal-btn.btn-clear:hover:not(:disabled) {
+  background: linear-gradient(180deg, #4a3a2a, #3a2a1a);
+  box-shadow: 0 0 10px rgba(255, 170, 74, 0.2);
+}
+
+@keyframes pulse-btn {
+  0%, 100% { box-shadow: 0 0 5px rgba(255, 74, 74, 0.3); }
+  50% { box-shadow: 0 0 15px rgba(255, 74, 74, 0.5); }
+}
+
+/* ============================================================
+   Effect Selector
+   ============================================================ */
+.effect-section {
+  margin-bottom: 20px;
+}
+
+.section-label {
+  display: block;
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+  text-align: center;
+  margin-bottom: 8px;
+}
+
+.effect-select {
+  font-family: 'Courier New', Courier, monospace;
+  font-size: 0.85rem;
+  width: 100%;
+  padding: 10px 14px;
+  background: var(--pedal-surface);
+  color: var(--text-primary);
+  border: 2px solid #555;
+  border-radius: 6px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23999' d='M6 8L1 3h10z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+}
+
+.effect-select:hover {
+  border-color: #777;
+}
+
+.effect-select:focus {
+  outline: none;
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 8px rgba(170, 74, 255, 0.2);
+}
+
+/* ============================================================
+   Parameter Knobs (Sliders styled as knob rows)
+   ============================================================ */
+.params-section {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.param-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.param-group label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  color: var(--text-secondary);
+  min-width: 65px;
+  text-align: right;
+}
+
+.param-slider {
+  flex: 1;
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: #222;
+  border-radius: 3px;
+  border: 1px solid #444;
+  outline: none;
+}
+
+.param-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle at 40% 40%, #777, #444);
+  border: 2px solid #222;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.param-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle at 40% 40%, #777, #444);
+  border: 2px solid #222;
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow:
+    0 2px 4px rgba(0,0,0,0.3),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.param-slider:hover::-webkit-slider-thumb {
+  background: radial-gradient(circle at 40% 40%, #999, #555);
+}
+
+.param-slider:hover::-moz-range-thumb {
+  background: radial-gradient(circle at 40% 40%, #999, #555);
+}
+
+.param-value {
+  font-size: 0.7rem;
+  color: var(--accent-blue);
+  min-width: 40px;
+  text-align: left;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ============================================================
+   Status Message
+   ============================================================ */
+.status-message {
+  text-align: center;
+  font-size: 0.75rem;
+  padding: 8px 12px;
+  border-radius: 6px;
+  background: var(--pedal-surface);
+  border: 1px solid #444;
+  color: var(--text-secondary);
+  min-height: 34px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.status-message.success {
+  color: var(--accent-green);
+  border-color: rgba(74, 255, 122, 0.3);
+  background: rgba(74, 255, 122, 0.05);
+}
+
+.status-message.error {
+  color: var(--accent-red);
+  border-color: rgba(255, 74, 74, 0.3);
+  background: rgba(255, 74, 74, 0.05);
+}
+
+.status-message.info {
+  color: var(--accent-blue);
+  border-color: rgba(74, 158, 255, 0.3);
+  background: rgba(74, 158, 255, 0.05);
+}
+
+/* ============================================================
+   Footer / Jack Labels
+   ============================================================ */
+.pedal-footer {
+  text-align: center;
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid #444;
+}
+
+.jack-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.6rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.jack-label {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.jack {
+  width: 20px;
+  height: 20px;
+  background: radial-gradient(circle, #111 40%, #333 60%, #222 100%);
+  border: 2px solid #555;
+  border-radius: 50%;
+}
+
+/* ============================================================
+   Page Footer Info
+   ============================================================ */
+.page-footer {
+  margin-top: 20px;
+  text-align: center;
+  font-size: 0.65rem;
+  color: var(--text-secondary);
+  max-width: 420px;
+}
+
+.page-footer a {
+  color: var(--accent-blue);
+  text-decoration: none;
+}
+
+.page-footer a:hover {
+  text-decoration: underline;
+}
+
+/* ============================================================
+   Responsive Design
+   ============================================================ */
+@media (max-width: 480px) {
+  body {
+    padding: 10px;
+  }
+
+  .pedal {
+    padding: 20px 15px;
+    border-radius: 14px;
+  }
+
+  .pedal-brand h1 {
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+  }
+
+  .pedal-btn {
+    font-size: 0.7rem;
+    padding: 10px 14px;
+    letter-spacing: 1px;
+  }
+
+  .param-group label {
+    min-width: 50px;
+    font-size: 0.6rem;
+  }
+
+  .privacy-notice {
+    font-size: 0.75rem;
+    padding: 10px 14px;
+  }
+
+  .button-row {
+    flex-wrap: wrap;
+  }
+}
