@@ -295,6 +295,505 @@ function createDistortionEffect(audioContext, params) {
 }
 
 /**
+ * Creates a fuzz effect using a WaveShaperNode with aggressive clipping.
+ * Inspired by Maestro Fuzztone / Big Muff / Fuzz Face.
+ *
+ * Parameters:
+ *   fuzz  - Fuzz intensity (0 = mild, 1 = extreme saturation)
+ *   tone  - Post-fuzz tone filter frequency (0 = dark, 1 = bright)
+ *   level - Output gain (0 = silent, 1 = full)
+ *
+ * Returns an object with input/output nodes and update/destroy methods.
+ */
+function createFuzzEffect(audioContext, params) {
+  var fuzz = clampParam(params.fuzz, 0, 1);
+  var tone = clampParam(params.tone, 0, 1);
+  var level = clampParam(params.level, 0, 1);
+
+  var inputGain = audioContext.createGain();
+  var outputGain = audioContext.createGain();
+  var preGain = audioContext.createGain();
+  var waveshaper = audioContext.createWaveShaper();
+  var toneFilter = audioContext.createBiquadFilter();
+  var postGain = audioContext.createGain();
+
+  // Aggressive sigmoid clipping curve for thick fuzz sustain
+  function makeFuzzCurve(amount) {
+    var samples = 44100;
+    var curve = new Float32Array(samples);
+    var k = 1 + amount * 99; // 1 to 100 saturation
+    for (var i = 0; i < samples; i++) {
+      var x = (i * 2) / samples - 1;
+      // Hard sigmoid with high saturation
+      curve[i] = (Math.PI + k) * x / (Math.PI + k * Math.abs(x));
+    }
+    return curve;
+  }
+
+  waveshaper.curve = makeFuzzCurve(fuzz);
+  waveshaper.oversample = '4x';
+
+  // Heavy pre-gain to push signal hard into clipping
+  preGain.gain.value = 1 + fuzz * 6;
+
+  // Tone filter: low-pass sweep from 500 Hz to 12 kHz
+  toneFilter.type = 'lowpass';
+  toneFilter.frequency.value = 500 + tone * 11500;
+
+  // Output level
+  postGain.gain.value = level;
+  outputGain.gain.value = 1;
+
+  // Signal routing: input -> preGain -> waveshaper -> toneFilter -> postGain -> output
+  inputGain.connect(preGain);
+  preGain.connect(waveshaper);
+  waveshaper.connect(toneFilter);
+  toneFilter.connect(postGain);
+  postGain.connect(outputGain);
+
+  return {
+    input: inputGain,
+    output: outputGain,
+
+    update: function(newParams) {
+      var newFuzz = clampParam(newParams.fuzz, 0, 1);
+      var newTone = clampParam(newParams.tone, 0, 1);
+      var newLevel = clampParam(newParams.level, 0, 1);
+
+      preGain.gain.setValueAtTime(1 + newFuzz * 6, audioContext.currentTime);
+      toneFilter.frequency.setValueAtTime(500 + newTone * 11500, audioContext.currentTime);
+      postGain.gain.setValueAtTime(newLevel, audioContext.currentTime);
+      waveshaper.curve = makeFuzzCurve(newFuzz);
+    },
+
+    destroy: function() {
+      inputGain.disconnect();
+      preGain.disconnect();
+      waveshaper.disconnect();
+      toneFilter.disconnect();
+      postGain.disconnect();
+      outputGain.disconnect();
+      waveshaper.curve = null;
+    }
+  };
+}
+
+/**
+ * Creates an overdrive effect using a WaveShaperNode with soft asymmetric clipping.
+ * Inspired by the Tubescreamer TS-808.
+ *
+ * Parameters:
+ *   drive - Drive intensity (0 = clean, 1 = heavy overdrive)
+ *   tone  - Mid-range emphasis (0 = dark/scooped, 1 = bright/mid-forward)
+ *   level - Output gain (0 = silent, 1 = full)
+ *
+ * Returns an object with input/output nodes and update/destroy methods.
+ */
+function createOverdriveEffect(audioContext, params) {
+  var drive = clampParam(params.drive, 0, 1);
+  var tone = clampParam(params.tone, 0, 1);
+  var level = clampParam(params.level, 0, 1);
+
+  var inputGain = audioContext.createGain();
+  var outputGain = audioContext.createGain();
+  var preGain = audioContext.createGain();
+  var midBoost = audioContext.createBiquadFilter();
+  var waveshaper = audioContext.createWaveShaper();
+  var toneFilter = audioContext.createBiquadFilter();
+  var postGain = audioContext.createGain();
+
+  // Soft asymmetric clipping (warmer than distortion, emphasizes even harmonics)
+  function makeOverdriveCurve(amount) {
+    var samples = 44100;
+    var curve = new Float32Array(samples);
+    for (var i = 0; i < samples; i++) {
+      var x = (i * 2) / samples - 1;
+      if (x >= 0) {
+        // Soft clip positive side
+        curve[i] = 1 - Math.exp(-x * (1 + amount * 5));
+      } else {
+        // Slightly harder clip negative side (asymmetry adds warmth)
+        curve[i] = -(1 - Math.exp(x * (1 + amount * 3.5)));
+      }
+    }
+    return curve;
+  }
+
+  waveshaper.curve = makeOverdriveCurve(drive);
+  waveshaper.oversample = '4x';
+
+  // Pre-gain into clipping
+  preGain.gain.value = 1 + drive * 4;
+
+  // Pre-emphasis: mid-range boost before clipping (TS-808 characteristic)
+  midBoost.type = 'peaking';
+  midBoost.frequency.value = 720; // Classic TS mid-hump frequency
+  midBoost.Q.value = 0.7;
+  midBoost.gain.value = 6 + drive * 6; // 6-12 dB mid boost
+
+  // Post tone filter
+  toneFilter.type = 'lowpass';
+  toneFilter.frequency.value = 1500 + tone * 10500; // 1.5kHz to 12kHz
+
+  // Output level
+  postGain.gain.value = level;
+  outputGain.gain.value = 1;
+
+  // Signal routing: input -> midBoost -> preGain -> waveshaper -> toneFilter -> postGain -> output
+  inputGain.connect(midBoost);
+  midBoost.connect(preGain);
+  preGain.connect(waveshaper);
+  waveshaper.connect(toneFilter);
+  toneFilter.connect(postGain);
+  postGain.connect(outputGain);
+
+  return {
+    input: inputGain,
+    output: outputGain,
+
+    update: function(newParams) {
+      var newDrive = clampParam(newParams.drive, 0, 1);
+      var newTone = clampParam(newParams.tone, 0, 1);
+      var newLevel = clampParam(newParams.level, 0, 1);
+
+      preGain.gain.setValueAtTime(1 + newDrive * 4, audioContext.currentTime);
+      midBoost.gain.setValueAtTime(6 + newDrive * 6, audioContext.currentTime);
+      toneFilter.frequency.setValueAtTime(1500 + newTone * 10500, audioContext.currentTime);
+      postGain.gain.setValueAtTime(newLevel, audioContext.currentTime);
+      waveshaper.curve = makeOverdriveCurve(newDrive);
+    },
+
+    destroy: function() {
+      inputGain.disconnect();
+      midBoost.disconnect();
+      preGain.disconnect();
+      waveshaper.disconnect();
+      toneFilter.disconnect();
+      postGain.disconnect();
+      outputGain.disconnect();
+      waveshaper.curve = null;
+    }
+  };
+}
+
+/**
+ * Creates a chorus effect using a modulated delay line.
+ * Inspired by the Boss CE-2.
+ *
+ * Parameters:
+ *   rate  - LFO speed in Hz (0.1 to 5.0)
+ *   depth - Modulation depth (0 = subtle, 1 = deep)
+ *   mix   - Wet/dry blend (0 = fully dry, 1 = fully wet)
+ *
+ * Returns an object with input/output nodes and update/destroy methods.
+ */
+function createChorusEffect(audioContext, params) {
+  var rate = clampParam(params.rate, 0.1, 5.0);
+  var depth = clampParam(params.depth, 0, 1);
+  var mix = clampParam(params.mix, 0, 1);
+
+  var inputGain = audioContext.createGain();
+  var outputGain = audioContext.createGain();
+  var dryGain = audioContext.createGain();
+  var wetGain = audioContext.createGain();
+  var delayNode = audioContext.createDelay(0.1);
+  var lfo = audioContext.createOscillator();
+  var lfoGain = audioContext.createGain();
+
+  // Base delay of 25ms with modulation depth up to +/- 7ms
+  delayNode.delayTime.value = 0.025;
+
+  // LFO modulates the delay time
+  lfo.type = 'sine';
+  lfo.frequency.value = rate;
+  lfoGain.gain.value = depth * 0.007; // Max 7ms sweep
+
+  lfo.connect(lfoGain);
+  lfoGain.connect(delayNode.delayTime);
+  lfo.start();
+
+  // Wet/dry mix
+  dryGain.gain.value = 1 - mix;
+  wetGain.gain.value = mix;
+  outputGain.gain.value = 1;
+
+  // Signal routing:
+  // input -> dryGain -> output (dry path)
+  // input -> delayNode -> wetGain -> output (modulated wet path)
+  inputGain.connect(dryGain);
+  dryGain.connect(outputGain);
+
+  inputGain.connect(delayNode);
+  delayNode.connect(wetGain);
+  wetGain.connect(outputGain);
+
+  return {
+    input: inputGain,
+    output: outputGain,
+
+    update: function(newParams) {
+      var newRate = clampParam(newParams.rate, 0.1, 5.0);
+      var newDepth = clampParam(newParams.depth, 0, 1);
+      var newMix = clampParam(newParams.mix, 0, 1);
+
+      lfo.frequency.setValueAtTime(newRate, audioContext.currentTime);
+      lfoGain.gain.setValueAtTime(newDepth * 0.007, audioContext.currentTime);
+      dryGain.gain.setValueAtTime(1 - newMix, audioContext.currentTime);
+      wetGain.gain.setValueAtTime(newMix, audioContext.currentTime);
+    },
+
+    destroy: function() {
+      lfo.stop();
+      lfo.disconnect();
+      lfoGain.disconnect();
+      inputGain.disconnect();
+      dryGain.disconnect();
+      wetGain.disconnect();
+      delayNode.disconnect();
+      outputGain.disconnect();
+    }
+  };
+}
+
+/**
+ * Creates a phaser effect using cascaded allpass filters modulated by an LFO.
+ * Inspired by the MXR Phase 90.
+ *
+ * Parameters:
+ *   rate      - LFO speed in Hz (0.1 to 5.0)
+ *   depth     - Frequency sweep range (0 = narrow, 1 = wide)
+ *   resonance - Feedback amount for more pronounced sweeps (0 to 0.9)
+ *
+ * Returns an object with input/output nodes and update/destroy methods.
+ */
+function createPhaserEffect(audioContext, params) {
+  var rate = clampParam(params.rate, 0.1, 5.0);
+  var depth = clampParam(params.depth, 0, 1);
+  // SECURITY: Cap resonance below 1.0 to prevent runaway feedback
+  var resonance = clampParam(params.resonance, 0, 0.9);
+
+  var inputGain = audioContext.createGain();
+  var outputGain = audioContext.createGain();
+  var dryGain = audioContext.createGain();
+  var wetGain = audioContext.createGain();
+  var feedbackGain = audioContext.createGain();
+
+  // 6 cascaded allpass filters for deep phase shifting
+  var numStages = 6;
+  var allpassFilters = [];
+  var stageFreqs = [200, 400, 800, 1600, 3200, 6400];
+  for (var i = 0; i < numStages; i++) {
+    var filter = audioContext.createBiquadFilter();
+    filter.type = 'allpass';
+    filter.frequency.value = stageFreqs[i];
+    filter.Q.value = 0.5;
+    allpassFilters.push(filter);
+  }
+
+  // LFO modulates allpass filter frequencies
+  var lfo = audioContext.createOscillator();
+  var lfoGains = [];
+  lfo.type = 'sine';
+  lfo.frequency.value = rate;
+
+  for (var j = 0; j < numStages; j++) {
+    var lg = audioContext.createGain();
+    // Each stage sweeps proportionally to its base frequency
+    lg.gain.value = stageFreqs[j] * depth;
+    lfo.connect(lg);
+    lg.connect(allpassFilters[j].frequency);
+    lfoGains.push(lg);
+  }
+  lfo.start();
+
+  // Mix and feedback
+  dryGain.gain.value = 0.5;
+  wetGain.gain.value = 0.5;
+  feedbackGain.gain.value = resonance;
+  outputGain.gain.value = 1;
+
+  // Chain allpass filters in series
+  inputGain.connect(allpassFilters[0]);
+  for (var k = 0; k < numStages - 1; k++) {
+    allpassFilters[k].connect(allpassFilters[k + 1]);
+  }
+
+  // Dry path
+  inputGain.connect(dryGain);
+  dryGain.connect(outputGain);
+
+  // Wet path from last allpass
+  allpassFilters[numStages - 1].connect(wetGain);
+  wetGain.connect(outputGain);
+
+  // Feedback from last allpass back to first
+  allpassFilters[numStages - 1].connect(feedbackGain);
+  feedbackGain.connect(allpassFilters[0]);
+
+  return {
+    input: inputGain,
+    output: outputGain,
+
+    update: function(newParams) {
+      var newRate = clampParam(newParams.rate, 0.1, 5.0);
+      var newDepth = clampParam(newParams.depth, 0, 1);
+      var newResonance = clampParam(newParams.resonance, 0, 0.9);
+
+      lfo.frequency.setValueAtTime(newRate, audioContext.currentTime);
+      feedbackGain.gain.setValueAtTime(newResonance, audioContext.currentTime);
+      for (var i = 0; i < numStages; i++) {
+        lfoGains[i].gain.setValueAtTime(stageFreqs[i] * newDepth, audioContext.currentTime);
+      }
+    },
+
+    destroy: function() {
+      lfo.stop();
+      lfo.disconnect();
+      for (var i = 0; i < numStages; i++) {
+        lfoGains[i].disconnect();
+        allpassFilters[i].disconnect();
+      }
+      inputGain.disconnect();
+      dryGain.disconnect();
+      wetGain.disconnect();
+      feedbackGain.disconnect();
+      outputGain.disconnect();
+    }
+  };
+}
+
+/**
+ * Creates a tremolo effect using LFO-modulated amplitude.
+ * Classic volume wobble effect.
+ *
+ * Parameters:
+ *   rate  - LFO speed in Hz (1 to 20)
+ *   depth - Modulation intensity (0 = no effect, 1 = full tremolo)
+ *
+ * Returns an object with input/output nodes and update/destroy methods.
+ */
+function createTremoloEffect(audioContext, params) {
+  var rate = clampParam(params.rate, 1, 20);
+  var depth = clampParam(params.depth, 0, 1);
+
+  var inputGain = audioContext.createGain();
+  var outputGain = audioContext.createGain();
+  var tremoloGain = audioContext.createGain();
+  var lfo = audioContext.createOscillator();
+  var lfoGain = audioContext.createGain();
+
+  // LFO modulates amplitude
+  // The gain oscillates between (1 - depth) and 1
+  tremoloGain.gain.value = 1 - depth / 2;
+
+  lfo.type = 'sine';
+  lfo.frequency.value = rate;
+
+  // LFO output range is -1 to 1; scale to -depth/2 to +depth/2
+  lfoGain.gain.value = depth / 2;
+
+  lfo.connect(lfoGain);
+  lfoGain.connect(tremoloGain.gain);
+  lfo.start();
+
+  outputGain.gain.value = 1;
+
+  // Signal routing: input -> tremoloGain -> output
+  inputGain.connect(tremoloGain);
+  tremoloGain.connect(outputGain);
+
+  return {
+    input: inputGain,
+    output: outputGain,
+
+    update: function(newParams) {
+      var newRate = clampParam(newParams.rate, 1, 20);
+      var newDepth = clampParam(newParams.depth, 0, 1);
+
+      lfo.frequency.setValueAtTime(newRate, audioContext.currentTime);
+      tremoloGain.gain.setValueAtTime(1 - newDepth / 2, audioContext.currentTime);
+      lfoGain.gain.setValueAtTime(newDepth / 2, audioContext.currentTime);
+    },
+
+    destroy: function() {
+      lfo.stop();
+      lfo.disconnect();
+      lfoGain.disconnect();
+      inputGain.disconnect();
+      tremoloGain.disconnect();
+      outputGain.disconnect();
+    }
+  };
+}
+
+/**
+ * Creates a wah-wah effect using a resonant bandpass filter.
+ * Inspired by the VOX wah pedal.
+ *
+ * Parameters:
+ *   frequency - Filter center frequency (0 = low 200Hz, 1 = high 2000Hz)
+ *   q         - Filter resonance / Q factor (0.5 to 15)
+ *   mix       - Wet/dry blend (0 = fully dry, 1 = fully wet)
+ *
+ * Returns an object with input/output nodes and update/destroy methods.
+ */
+function createWahEffect(audioContext, params) {
+  var frequency = clampParam(params.frequency, 0, 1);
+  var q = clampParam(params.q, 0.5, 15);
+  var mix = clampParam(params.mix, 0, 1);
+
+  var inputGain = audioContext.createGain();
+  var outputGain = audioContext.createGain();
+  var dryGain = audioContext.createGain();
+  var wetGain = audioContext.createGain();
+  var wahFilter = audioContext.createBiquadFilter();
+
+  // Bandpass filter sweeps from 200 Hz to 2000 Hz
+  wahFilter.type = 'bandpass';
+  wahFilter.frequency.value = 200 + frequency * 1800;
+  wahFilter.Q.value = q;
+
+  // Wet/dry mix
+  dryGain.gain.value = 1 - mix;
+  wetGain.gain.value = mix;
+  outputGain.gain.value = 1;
+
+  // Signal routing:
+  // input -> dryGain -> output (dry path)
+  // input -> wahFilter -> wetGain -> output (filtered wet path)
+  inputGain.connect(dryGain);
+  dryGain.connect(outputGain);
+
+  inputGain.connect(wahFilter);
+  wahFilter.connect(wetGain);
+  wetGain.connect(outputGain);
+
+  return {
+    input: inputGain,
+    output: outputGain,
+
+    update: function(newParams) {
+      var newFrequency = clampParam(newParams.frequency, 0, 1);
+      var newQ = clampParam(newParams.q, 0.5, 15);
+      var newMix = clampParam(newParams.mix, 0, 1);
+
+      wahFilter.frequency.setValueAtTime(200 + newFrequency * 1800, audioContext.currentTime);
+      wahFilter.Q.setValueAtTime(newQ, audioContext.currentTime);
+      dryGain.gain.setValueAtTime(1 - newMix, audioContext.currentTime);
+      wetGain.gain.setValueAtTime(newMix, audioContext.currentTime);
+    },
+
+    destroy: function() {
+      inputGain.disconnect();
+      dryGain.disconnect();
+      wetGain.disconnect();
+      wahFilter.disconnect();
+      outputGain.disconnect();
+    }
+  };
+}
+
+/**
  * Factory function: creates the appropriate effect based on name.
  * SECURITY: Only known effect names are accepted; unknown names return null.
  */
@@ -306,6 +805,18 @@ function createEffect(audioContext, effectName, params) {
       return createDelayEffect(audioContext, params);
     case 'distortion':
       return createDistortionEffect(audioContext, params);
+    case 'fuzz':
+      return createFuzzEffect(audioContext, params);
+    case 'overdrive':
+      return createOverdriveEffect(audioContext, params);
+    case 'chorus':
+      return createChorusEffect(audioContext, params);
+    case 'phaser':
+      return createPhaserEffect(audioContext, params);
+    case 'tremolo':
+      return createTremoloEffect(audioContext, params);
+    case 'wah':
+      return createWahEffect(audioContext, params);
     default:
       // SECURITY: Reject unknown effect names
       console.warn('Unknown effect type requested:', effectName);

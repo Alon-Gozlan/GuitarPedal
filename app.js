@@ -67,6 +67,36 @@
       param1: { label: 'Mix', min: 0, max: 100, default: 70, unit: '%' },
       param2: { label: 'Drive', min: 0, max: 100, default: 50, unit: '%' },
       param3: { label: 'Tone', min: 0, max: 100, default: 60, unit: '%' }
+    },
+    fuzz: {
+      param1: { label: 'Fuzz', min: 0, max: 100, default: 70, unit: '%' },
+      param2: { label: 'Tone', min: 0, max: 100, default: 50, unit: '%' },
+      param3: { label: 'Level', min: 0, max: 100, default: 60, unit: '%' }
+    },
+    overdrive: {
+      param1: { label: 'Drive', min: 0, max: 100, default: 55, unit: '%' },
+      param2: { label: 'Tone', min: 0, max: 100, default: 60, unit: '%' },
+      param3: { label: 'Level', min: 0, max: 100, default: 65, unit: '%' }
+    },
+    chorus: {
+      param1: { label: 'Rate', min: 1, max: 50, default: 15, unit: 'Hz' },
+      param2: { label: 'Depth', min: 0, max: 100, default: 50, unit: '%' },
+      param3: { label: 'Mix', min: 0, max: 100, default: 50, unit: '%' }
+    },
+    phaser: {
+      param1: { label: 'Rate', min: 1, max: 50, default: 10, unit: 'Hz' },
+      param2: { label: 'Depth', min: 0, max: 100, default: 60, unit: '%' },
+      param3: { label: 'Resonance', min: 0, max: 90, default: 40, unit: '%' }
+    },
+    tremolo: {
+      param1: { label: 'Rate', min: 10, max: 200, default: 60, unit: 'Hz' },
+      param2: { label: 'Depth', min: 0, max: 100, default: 60, unit: '%' },
+      param3: { label: '', min: 0, max: 0, default: 0, unit: '' }
+    },
+    wah: {
+      param1: { label: 'Frequency', min: 0, max: 100, default: 50, unit: '%' },
+      param2: { label: 'Q', min: 5, max: 150, default: 50, unit: '' },
+      param3: { label: 'Mix', min: 0, max: 100, default: 80, unit: '%' }
     }
   };
 
@@ -177,13 +207,17 @@
     param2Slider.value = config.param2.default;
     param2Value.textContent = config.param2.default + config.param2.unit;
 
-    // Param 3
-    paramGroup3.style.display = 'flex';
-    param3Label.textContent = config.param3.label;
-    param3Slider.min = config.param3.min;
-    param3Slider.max = config.param3.max;
-    param3Slider.value = config.param3.default;
-    param3Value.textContent = config.param3.default + config.param3.unit;
+    // Param 3 (hidden if label is empty, e.g. tremolo only uses 2 params)
+    if (config.param3.label) {
+      paramGroup3.style.display = 'flex';
+      param3Label.textContent = config.param3.label;
+      param3Slider.min = config.param3.min;
+      param3Slider.max = config.param3.max;
+      param3Slider.value = config.param3.default;
+      param3Value.textContent = config.param3.default + config.param3.unit;
+    } else {
+      paramGroup3.style.display = 'none';
+    }
   }
 
   /**
@@ -222,6 +256,41 @@
           mix: p1 / 100,
           drive: p2 / 100,
           tone: p3 / 100
+        };
+      case 'fuzz':
+        return {
+          fuzz: p1 / 100,
+          tone: p2 / 100,
+          level: p3 / 100
+        };
+      case 'overdrive':
+        return {
+          drive: p1 / 100,
+          tone: p2 / 100,
+          level: p3 / 100
+        };
+      case 'chorus':
+        return {
+          rate: p1 / 10,        // slider 1-50 maps to 0.1-5.0 Hz
+          depth: p2 / 100,
+          mix: p3 / 100
+        };
+      case 'phaser':
+        return {
+          rate: p1 / 10,        // slider 1-50 maps to 0.1-5.0 Hz
+          depth: p2 / 100,
+          resonance: p3 / 100   // slider 0-90 maps to 0.0-0.9
+        };
+      case 'tremolo':
+        return {
+          rate: p1 / 10,        // slider 10-200 maps to 1-20 Hz
+          depth: p2 / 100
+        };
+      case 'wah':
+        return {
+          frequency: p1 / 100,
+          q: p2 / 10,           // slider 5-150 maps to 0.5-15
+          mix: p3 / 100
         };
       default:
         return {};
