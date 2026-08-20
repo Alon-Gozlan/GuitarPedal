@@ -401,6 +401,13 @@ function createOverdriveEffect(audioContext, params) {
   var waveshaper = audioContext.createWaveShaper();
   var toneFilter = audioContext.createBiquadFilter();
   var postGain = audioContext.createGain();
+  // Asymmetric clipping is what gives the TS-808 its warmth, but it also
+  // shifts the waveform off zero. Block that DC before it reaches the output,
+  // where it would cost headroom and thump the speaker on start/stop.
+  var dcBlocker = audioContext.createBiquadFilter();
+  dcBlocker.type = 'highpass';
+  dcBlocker.frequency.value = 25;
+  dcBlocker.Q.value = 0.707;
 
   // Soft asymmetric clipping (warmer than distortion, emphasizes even harmonics)
   function makeOverdriveCurve(amount) {
@@ -439,11 +446,13 @@ function createOverdriveEffect(audioContext, params) {
   postGain.gain.value = level;
   outputGain.gain.value = 1;
 
-  // Signal routing: input -> midBoost -> preGain -> waveshaper -> toneFilter -> postGain -> output
+  // Signal routing:
+  // input -> midBoost -> preGain -> waveshaper -> dcBlocker -> toneFilter -> postGain -> output
   inputGain.connect(midBoost);
   midBoost.connect(preGain);
   preGain.connect(waveshaper);
-  waveshaper.connect(toneFilter);
+  waveshaper.connect(dcBlocker);
+  dcBlocker.connect(toneFilter);
   toneFilter.connect(postGain);
   postGain.connect(outputGain);
 
@@ -468,6 +477,7 @@ function createOverdriveEffect(audioContext, params) {
       midBoost.disconnect();
       preGain.disconnect();
       waveshaper.disconnect();
+      dcBlocker.disconnect();
       toneFilter.disconnect();
       postGain.disconnect();
       outputGain.disconnect();
@@ -577,6 +587,11 @@ function createPhaserEffect(audioContext, params) {
   var dryGain = audioContext.createGain();
   var wetGain = audioContext.createGain();
   var feedbackGain = audioContext.createGain();
+  // The feedback path MUST contain a DelayNode. The Web Audio spec only
+  // permits a cycle in the graph when a DelayNode is present in it; without
+  // one the whole cycle is muted and the Resonance control does nothing.
+  var feedbackDelay = audioContext.createDelay(0.05);
+  feedbackDelay.delayTime.value = 0.002; // 2 ms - short enough to stay a phaser
 
   // 6 cascaded allpass filters for deep phase shifting
   var numStages = 6;
@@ -590,7 +605,11 @@ function createPhaserEffect(audioContext, params) {
     allpassFilters.push(filter);
   }
 
-  // LFO modulates allpass filter frequencies
+  // LFO modulates allpass filter frequencies.
+  // The sweep is limited to +/-60% of each stage's base frequency so the
+  // filter frequency can never approach 0 Hz, where a biquad allpass turns
+  // degenerate and rings loudly.
+  var SWEEP = 0.6;
   var lfo = audioContext.createOscillator();
   var lfoGains = [];
   lfo.type = 'sine';
@@ -598,8 +617,7 @@ function createPhaserEffect(audioContext, params) {
 
   for (var j = 0; j < numStages; j++) {
     var lg = audioContext.createGain();
-    // Each stage sweeps proportionally to its base frequency
-    lg.gain.value = stageFreqs[j] * depth;
+    lg.gain.value = stageFreqs[j] * SWEEP * depth;
     lfo.connect(lg);
     lg.connect(allpassFilters[j].frequency);
     lfoGains.push(lg);
@@ -626,9 +644,11 @@ function createPhaserEffect(audioContext, params) {
   allpassFilters[numStages - 1].connect(wetGain);
   wetGain.connect(outputGain);
 
-  // Feedback from last allpass back to first
+  // Feedback from last allpass back to first, via the delay that makes the
+  // cycle legal under the Web Audio spec.
   allpassFilters[numStages - 1].connect(feedbackGain);
-  feedbackGain.connect(allpassFilters[0]);
+  feedbackGain.connect(feedbackDelay);
+  feedbackDelay.connect(allpassFilters[0]);
 
   return {
     input: inputGain,
@@ -642,7 +662,7 @@ function createPhaserEffect(audioContext, params) {
       lfo.frequency.setValueAtTime(newRate, audioContext.currentTime);
       feedbackGain.gain.setValueAtTime(newResonance, audioContext.currentTime);
       for (var i = 0; i < numStages; i++) {
-        lfoGains[i].gain.setValueAtTime(stageFreqs[i] * newDepth, audioContext.currentTime);
+        lfoGains[i].gain.setValueAtTime(stageFreqs[i] * SWEEP * newDepth, audioContext.currentTime);
       }
     },
 
@@ -657,6 +677,7 @@ function createPhaserEffect(audioContext, params) {
       dryGain.disconnect();
       wetGain.disconnect();
       feedbackGain.disconnect();
+      feedbackDelay.disconnect();
       outputGain.disconnect();
     }
   };
@@ -748,10 +769,18 @@ function createWahEffect(audioContext, params) {
   var wetGain = audioContext.createGain();
   var wahFilter = audioContext.createBiquadFilter();
 
-  // Bandpass filter sweeps from 200 Hz to 2000 Hz
-  wahFilter.type = 'bandpass';
+  // A resonant PEAKING filter sweeping 200 Hz -> 2000 Hz.
+  //
+  // A pure bandpass is the textbook wah, but at high Q it throws away every
+  // frequency outside the band: sweep the band away from the note's harmonics
+  // and the guitar drops to near-silence. A peaking filter passes the whole
+  // signal and boosts the swept band instead, so the resonance still gives the
+  // vocal "wah" while the note is always audible.
+  var PEAK_GAIN_DB = 16;
+  wahFilter.type = 'peaking';
   wahFilter.frequency.value = 200 + frequency * 1800;
   wahFilter.Q.value = q;
+  wahFilter.gain.value = PEAK_GAIN_DB;
 
   // Wet/dry mix
   dryGain.gain.value = 1 - mix;
